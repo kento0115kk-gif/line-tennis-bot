@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+
+# 機密情報。.env.example のみコミットする。
+.env
+
+# ローカル実行時のログ
+logs/
+
+# last_state.json は GitHub Actions が状態を引き継ぐために
+# あえてコミットする（ignore しない）。

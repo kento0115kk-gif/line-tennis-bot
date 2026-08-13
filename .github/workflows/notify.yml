@@ -1,0 +1,69 @@
+name: 空きコート通知
+
+on:
+  schedule:
+    # 30分おき（cron は UTC だが、30分間隔なのでタイムゾーンの影響を受けない）
+    - cron: "*/30 * * * *"
+  # 手動実行も可能にする
+  workflow_dispatch:
+
+# last_state.json をコミットで書き戻すために必要
+permissions:
+  contents: write
+
+# 実行が重ならないようにする（前回が長引いても二重通知しない）
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # 夜間停止の判定は現地時刻で行うため必須。
+      # これが無いと UTC 基準になり、停止時間帯が9時間ずれる。
+      TZ: Asia/Tokyo
+      LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+      LINE_TO: ${{ secrets.LINE_TO }}
+      QUIET_START: "23"
+      QUIET_END: "7"
+      WEEKDAY_FROM_HOUR: "19"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 依存パッケージをインストール
+        run: pip install -r requirements.txt
+
+      - name: Playwright のブラウザをキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Chromium をインストール
+        run: playwright install --with-deps chromium
+
+      - name: 空き状況を確認して通知
+        run: python main.py --weeks 2
+
+      - name: 通知済み状態を保存
+        # 通知に失敗しても、それまでの状態は残しておく
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain last_state.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add last_state.json
+            git commit -m "chore: update last_state.json [skip ci]"
+            git push
+          else
+            echo "状態に変化なし"
+          fi
