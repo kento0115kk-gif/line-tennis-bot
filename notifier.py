@@ -6,8 +6,6 @@ import sys
 
 import requests
 
-from check_availability import PARK_NAME
-
 PUSH_URL = "https://api.line.me/v2/bot/message/push"
 BROADCAST_URL = "https://api.line.me/v2/bot/message/broadcast"
 
@@ -61,7 +59,7 @@ def _row(icon, label, value):
 def build_bubble(slot, weather):
     """空き枠1件分のカードを組み立てる。"""
     body = [
-        {"type": "text", "text": PARK_NAME, "size": "lg", "weight": "bold", "wrap": True},
+        {"type": "text", "text": slot.park_name, "size": "lg", "weight": "bold", "wrap": True},
         {"type": "separator", "margin": "lg"},
         {
             "type": "box",
@@ -152,7 +150,11 @@ def build_message(slots, forecast_lookup):
     shown = slots[:MAX_BUBBLES]
     bubbles = [build_bubble(s, forecast_lookup(s)) for s in shown]
 
-    alt = f"空きコート {len(slots)}件（{_date_label(shown[0].day)} ほか）"
+    # 複数公園が混在する場合でも一目で分かるよう、プッシュ通知のプレビュー
+    # （altText）に公園名を含める。
+    parks = sorted({s.park_name for s in slots})
+    park_label = "・".join(parks) if len(parks) <= 3 else f"{len(parks)}公園"
+    alt = f"【{park_label}】空きコート {len(slots)}件（{_date_label(shown[0].day)} ほか）"
     if len(slots) > MAX_BUBBLES:
         alt += f" ※先頭{MAX_BUBBLES}件を表示"
 

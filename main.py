@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""有明テニスの森公園の空きコートを監視し、新しい枠が出たら LINE に通知する。
+"""都立公園（有明テニスの森公園・日比谷公園・木場公園・猿江恩賜公園）の
+空きコートを監視し、新しい枠が出たら LINE に通知する。
 
   1. 夜間（既定 23:00〜7:00）は何もせず終了する
   2. 空き状況をスクレイピングする
@@ -117,10 +118,13 @@ def main():
         return 0
 
     print(f"新規: {len(targets)} 件 → 通知します", file=sys.stderr)
-    targets.sort(key=lambda s: (s.day, s.hour, s.facility))
+    targets.sort(key=lambda s: (s.day, s.hour, s.park_name, s.facility))
 
-    forecast = weather.fetch_hourly()
-    message = notifier.build_message(targets, lambda s: weather.for_slot(forecast, s.day, s.hour))
+    # 公園ごとに座標が異なるため、天気も公園ごとに取得する。
+    forecasts = weather.fetch_for_parks(s.park_name for s in targets)
+    message = notifier.build_message(
+        targets, lambda s: weather.for_slot(forecasts.get(s.park_name, {}), s.day, s.hour)
+    )
 
     if args.dry_run:
         notifier.dump(message)

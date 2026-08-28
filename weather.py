@@ -1,4 +1,4 @@
-"""有明（江東区）の時間別天気を Open-Meteo から取得する。
+"""監視対象の各公園の時間別天気を Open-Meteo から取得する。
 
 Open-Meteo は API キー不要・商用利用可の無料 API で、16日先までの
 時間別予報を返す。Yahoo!天気は時間別予報の公開 API がないため採用しなかった。
@@ -9,9 +9,17 @@ from datetime import datetime
 
 import requests
 
-# 有明テニスの森公園の座標
+# 有明テニスの森公園の座標（既定値・後方互換のため残す）
 LATITUDE = 35.6355
 LONGITUDE = 139.7939
+
+# 監視対象公園の座標。天気は公園ごとに変わりうるため、公園ごとに取得する。
+PARK_COORDS = {
+    "有明テニスの森公園": (35.6355, 139.7939),
+    "日比谷公園": (35.67487, 139.75655),
+    "木場公園": (35.67455, 139.8079),
+    "猿江恩賜公園": (35.68991, 139.81844),
+}
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
 
@@ -84,8 +92,8 @@ class Weather:
         return text
 
 
-def fetch_hourly(timeout=20):
-    """時間別予報を {datetime: Weather} で返す。失敗時は空 dict。
+def fetch_hourly(latitude=LATITUDE, longitude=LONGITUDE, timeout=20):
+    """指定座標の時間別予報を {datetime: Weather} で返す。失敗時は空 dict。
 
     予報が取れなくても空き通知自体は送りたいので、例外は投げず握りつぶす。
     """
@@ -93,8 +101,8 @@ def fetch_hourly(timeout=20):
         res = requests.get(
             API_URL,
             params={
-                "latitude": LATITUDE,
-                "longitude": LONGITUDE,
+                "latitude": latitude,
+                "longitude": longitude,
                 "hourly": "temperature_2m,weather_code,precipitation_probability",
                 "timezone": "Asia/Tokyo",
                 "forecast_days": 16,
@@ -115,6 +123,19 @@ def fetch_hourly(timeout=20):
             hourly["temperature_2m"][i],
             hourly["precipitation_probability"][i],
         )
+    return out
+
+
+def fetch_for_parks(park_names, timeout=20):
+    """公園名ごとに時間別予報を取得する。
+
+    公園によって座標が異なるため、天気も公園ごとに取得する。
+    {公園名: {datetime: Weather}} を返す（未知の公園は既定座標＝有明で代用）。
+    """
+    out = {}
+    for name in dict.fromkeys(park_names):  # 順序を保ちつつ重複を除く
+        latitude, longitude = PARK_COORDS.get(name, (LATITUDE, LONGITUDE))
+        out[name] = fetch_hourly(latitude, longitude, timeout=timeout)
     return out
 
 
