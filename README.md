@@ -77,7 +77,7 @@ cp .env.example .env   # LINE のトークンなどを記入
 
 ## 自動実行
 
-GitHub Actions（`.github/workflows/notify.yml`）で30分おきに実行する。
+GitHub Actions（`.github/workflows/notify.yml`）で15分おきに実行する。
 
 リポジトリの Secrets に以下を登録する:
 
